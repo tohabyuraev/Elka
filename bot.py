@@ -13,6 +13,7 @@ from telebot.types import Update
 
 import text
 from config import DEFAULT_DATA, KEY_LIST
+from parsing import schedule_text
 from keyboard import keyboard, schedule_kboard
 from aeroexpress import aeroexpress_kboard, aeroexpress_schedule_kboard
 
@@ -46,11 +47,14 @@ def start_search(message):
 
 @bot.message_handler(commands=['aeroexp'])
 def aeroexpress_search(message):
-    bot.send_message(
-        message.from_user.id,
-        text=text.MSG_AERO,
-        reply_markup=aeroexpress_kboard()
-    )
+    bot.send_message(message.from_user.id, text.MSG_AERO,
+                     reply_markup=aeroexpress_kboard())
+
+
+@bot.message_handler(commands=['scheme'])
+def send_scheme(message):
+    URL = 'https://ilyabirman.ru/projects/cppk-map/download/cppk-map-v164.pdf'
+    bot.send_document(message.from_user.id, URL)
 
 
 @bot.message_handler(content_types=['text'])
@@ -91,12 +95,11 @@ def callback_worker(call):
         )
     elif procedure['call'] == 'schedule':
         bot.answer_callback_query(call.id, 'Станция назначения выбрана')
-        schedule_keyboard = schedule_kboard(procedure)
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text='Держи расписание! Доброго пути)',
-            reply_markup=schedule_keyboard
+            text=schedule_text(procedure),
+            reply_markup=schedule_kboard(procedure)
         )
     elif procedure['call'] == 'aeroexpress':
         bot.answer_callback_query(call.id, 'Направление выбрано')

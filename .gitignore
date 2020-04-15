@@ -6,7 +6,3 @@ __pycache__
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
-
-# Вспомогательные папки
-db_builder/
-unused files/

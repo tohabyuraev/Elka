@@ -75,7 +75,7 @@ def callback(instructions: dict, value) -> str:
         out['dep'] = value
     elif out['call'] == 'destination':
         out['call'] = 'schedule'
-        out['dest'] = value
+        out['des'] = value
     return pack_data(out)
 
 
@@ -97,7 +97,7 @@ def db_data(direction=None) -> dict:
 
 
 def pack_data(data: dict) -> str:
-    return '{call}:{dir}:{dep}:{dest}:{page}'.format(**data)
+    return '{call}:{dir}:{dep}:{des}:{page}'.format(**data)
 
 
 def split_list(argument: list) -> list:
@@ -114,8 +114,13 @@ def page_number_text(instructions: dict, page_number: int) -> str:
 
 def schedule_kboard(instructions: dict) -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup()
+    update_button = InlineKeyboardButton(
+        text='Обновить расписание',
+        callback_data=pack_data(instructions)
+    )
+    keyboard.add(update_button)
     schedule_link_button = InlineKeyboardButton(
-        text='Расписание',
+        text='Расписание на tutu.ru',
         url=get_url(instructions)
     )
     keyboard.add(schedule_link_button)
@@ -125,5 +130,5 @@ def schedule_kboard(instructions: dict) -> InlineKeyboardMarkup:
 def get_url(instructions: dict):
     return (
         'https://www.tutu.ru/rasp.php?st1={}&st2={}'
-        .format(instructions['dep'], instructions['dest'])
+        .format(instructions['dep'], instructions['des'])
     )

@@ -1,21 +1,18 @@
 """
 text.py -- текстовые команды бота
-
-author: Anthony Byuraev
-email: anthony.byuraev@gmail.com
+---
 """
 
 __author__ = 'Anthony Byuraev'
 
-__all__ = ['MSG_START', 'MSG_HELP', 'MSG_HELLO', 'MSG_SEARCH']
-
 
 MSG_START = (
     'Я помогу тебе найти расписание электричек.\n\n'
-    'У меня есть несколько команд:\n'
+    'У меня есть несколько команд:\n\n'
     '/help - показать подсказку\n'
     '/search - начать поиск\n'
-    '/aeroexp - быстрый поиск аэроэкспрессов'
+    '/aeroexp - быстрый поиск аэроэкспрессов\n'
+    '/scheme - показать схему пригородного сообщения'
 )
 
 MSG_HELP = (
