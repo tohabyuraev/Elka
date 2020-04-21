@@ -1,3 +1,4 @@
-pytelegrambotapi
+lxml
 flask
 beautifulsoup4
+pytelegrambotapi

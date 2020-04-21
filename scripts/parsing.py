@@ -3,6 +3,7 @@ parsing.py - parsing web schedule data
 ---
 """
 
+import json
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -11,17 +12,21 @@ from bs4 import BeautifulSoup
 __author__ = 'Anthony Byuraev'
 
 
+STATION_DB = 'db/stations.json'
+
+
 def schedule_text(instructions: dict) -> str:
     ROWS = 3
     LINK = (
         'https://www.tutu.ru/rasp.php?st1={}&st2={}&print=yes'
         .format(instructions['dep'], instructions['des'])
     )
-    content = requests.get(LINK).content
-    soup = BeautifulSoup(content, features='html.parser')
-    title = soup.title.text.split('.')[0] + '\n\n'
 
-    TZ_MSK = timezone(timedelta(hours=3))
+    content = requests.get(LINK).content
+    soup = BeautifulSoup(content, 'lxml')
+    title = title_text(instructions)
+
+    TZ_MSK = timezone(timedelta(hours=3))   # UTC+3
     time_now = str(datetime.now(TZ_MSK))[11:16]   # format: 'hh:mm'
 
     dep_time_root = soup.tbody('div',
@@ -66,3 +71,21 @@ def interval(time_from, time_to) -> str:
 
 def center_text(time_from, time_to):
     return f'{time_from} - {interval(time_from, time_to)} - {time_to}'
+
+
+def title_text(instructions: dict) -> str:
+
+    direction = instructions['dir']
+    departure = int(instructions['dep'])
+    destination = int(instructions['des'])
+
+    with open(STATION_DB) as db:
+        data = json.load(db)
+        stations = data[direction]
+
+    name = {stations[key]['code']: stations[key]['name'] for key in stations}
+
+    return (
+        'Расписание от станции {} до станции {} с изменениями\n\n'
+        .format(name[departure], name[destination])
+    )

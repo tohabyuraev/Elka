@@ -12,10 +12,10 @@ from flask import Flask, request
 from telebot.types import Update
 
 import text
-from config import DEFAULT_DATA, KEY_LIST
-from parsing import schedule_text
-from keyboard import keyboard, schedule_kboard
-from aeroexpress import aeroexpress_kboard, aeroexpress_schedule_kboard
+from config import DEFAULT_DATA, SCHEME
+from scripts.date import calendar_kboard, calendar_worker
+from scripts.keyboard import keyboard, keyboard_worker, unpack_data
+from scripts.aeroexpress import aeroexpress_kboard, aeroexpress_worker
 
 __author__ = 'Anthony Byuraev'
 
@@ -53,8 +53,13 @@ def aeroexpress_search(message):
 
 @bot.message_handler(commands=['scheme'])
 def send_scheme(message):
-    URL = 'https://ilyabirman.ru/projects/cppk-map/download/cppk-map-v164.pdf'
-    bot.send_document(message.from_user.id, URL)
+    bot.send_document(message.from_user.id, SCHEME)
+
+
+@bot.message_handler(commands=['calendar'])
+def send_calendar(message):
+    bot.send_message(message.from_user.id, 'Выбери дату',
+                     reply_markup=calendar_kboard())
 
 
 @bot.message_handler(content_types=['text'])
@@ -67,54 +72,9 @@ def send_text_message(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
-    procedure = unpack_data(call.data)
-    if procedure['call'] == 'search':
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text=text.MSG_SEARCH,
-            reply_markup=keyboard(procedure)
-        )
-    elif procedure['call'] == 'departure':
-        bot.answer_callback_query(call.id, 'Направление выбрано')
-        departure_keyboard = keyboard(procedure)
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text='Выбери станцию отправления:',
-            reply_markup=departure_keyboard
-        )
-    elif procedure['call'] == 'destination':
-        bot.answer_callback_query(call.id, 'Станция отправления выбрана')
-        destination_keyboard = keyboard(procedure)
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text='Выбери станцию назначения:',
-            reply_markup=destination_keyboard
-        )
-    elif procedure['call'] == 'schedule':
-        bot.answer_callback_query(call.id, 'Станция назначения выбрана')
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text=schedule_text(procedure),
-            reply_markup=schedule_kboard(procedure)
-        )
-    elif procedure['call'] == 'aeroexpress':
-        bot.answer_callback_query(call.id, 'Направление выбрано')
-        schedule_keyboard = aeroexpress_schedule_kboard(procedure)
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text='Держи расписание Aeroexpress\nи ссылку на сайт аэропорта',
-            reply_markup=schedule_keyboard
-        )
-
-
-def unpack_data(callback: str) -> dict:
-    instructions = dict(zip(KEY_LIST, callback.split(':')))
-    return instructions
+    keyboard_worker(bot, call)
+    aeroexpress_worker(bot, call)
+    calendar_worker(bot, call)
 
 
 if "HEROKU" in list(os.environ.keys()):

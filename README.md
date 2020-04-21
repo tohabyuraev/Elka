@@ -1,5 +1,5 @@
 <div align="center">
-    <img scr="https://github.com/tohabyuraev/elka-schedule-bot/pictures/bigLogo.jpg">
+    <img scr="https://github.com/tohabyuraev/elka-schedule-bot/blob/master/pictures/bigLogo.jpg">
 </div>
 
 # Elka - telegram bot to search a suburban train schedule
@@ -16,4 +16,4 @@ git clone https://github.com/tohabyuraev/elka-schedule-bot
 ```
 
 ## Authors
-* **Антон Бюраев** - [tohabyuraev](https://github.com/tohabyuraev)
+* **Anthony Byuraev** - [tohabyuraev](https://github.com/tohabyuraev)
