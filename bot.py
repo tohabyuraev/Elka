@@ -5,9 +5,9 @@ bot.py - the main bot file
 """
 
 import os
+import logging
 
 import telebot
-import logging
 from flask import Flask, request
 from telebot.types import Update
 
@@ -20,12 +20,18 @@ from scripts.aeroexpress import aeroexpress_kboard, aeroexpress_worker
 __author__ = 'Anthony Byuraev'
 
 
-WEBHOOK_HOST = os.getenv('HOST')
+WEBHOOK_HOST = str(os.getenv('HOST'))
+WEBHOOK_PORT = int(os.environ.get('PORT', '8443'))
 WEBHOOK_LISTEN = '0.0.0.0'
 
 TOKEN = os.getenv('TOKEN')
 
+server = Flask(__name__)
+
 bot = telebot.TeleBot(TOKEN)
+
+logger = telebot.logger
+telebot.logger.setLevel(logging.INFO)
 
 
 @bot.message_handler(commands=['start'])
@@ -77,24 +83,16 @@ def callback_worker(call):
     calendar_worker(bot, call)
 
 
-if "HEROKU" in list(os.environ.keys()):
-    logger = telebot.logger
-    telebot.logger.setLevel(logging.INFO)
-    server = Flask(__name__)
+@server.route('/' + TOKEN, methods=['POST'])
+def get_updates():
+    bot.process_new_updates(
+        [Update.de_json(request.stream.read().decode("utf-8"))]
+    )
+    return '!', 200
 
-    @server.route("/" + TOKEN, methods=['POST'])
-    def getMessage():
-        bot.process_new_updates(
-            [Update.de_json(request.stream.read().decode("utf-8"))]
-        )
-        return "!", 200
 
-    @server.route("/")
-    def webhook():
-        bot.remove_webhook()
-        bot.set_webhook(url=WEBHOOK_HOST + TOKEN)
-        return "?", 200
-    server.run(host=WEBHOOK_LISTEN, port=os.environ.get('PORT', 5000))
-else:
-    bot.remove_webhook()
-    bot.polling(none_stop=True)
+bot.remove_webhook()
+bot.set_webhook(url=WEBHOOK_HOST + TOKEN)
+
+if __name__ == "__main__":
+    server.run(host=WEBHOOK_LISTEN, port=WEBHOOK_PORT)

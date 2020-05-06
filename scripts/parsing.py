@@ -23,7 +23,7 @@ def schedule_text(instructions: dict) -> str:
     )
 
     content = requests.get(LINK).content
-    soup = BeautifulSoup(content, 'lxml')
+    soup = BeautifulSoup(content, 'html.parser')
     title = title_text(instructions)
 
     TZ_MSK = timezone(timedelta(hours=3))   # UTC+3

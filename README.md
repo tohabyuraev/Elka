@@ -1,6 +1,6 @@
-<div align="center">
+<p align="center">
     <img scr="https://github.com/tohabyuraev/elka-schedule-bot/blob/master/pictures/bigLogo.jpg">
-</div>
+</p>
 
 # Elka - telegram bot to search a suburban train schedule
 Элка - телеграм бот для поиска расписания электричек
