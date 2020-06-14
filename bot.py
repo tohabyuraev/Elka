@@ -12,9 +12,10 @@ from flask import Flask, request
 from telebot.types import Update
 
 import text
+import util
 from config import DEFAULT_DATA, SCHEME
 from scripts.date import calendar_kboard, calendar_worker
-from scripts.keyboard import keyboard, keyboard_worker, unpack_data
+from scripts.keyboard import direction_kboard, keyboard_worker
 from scripts.aeroexpress import aeroexpress_kboard, aeroexpress_worker
 
 __author__ = 'Anthony Byuraev'
@@ -46,9 +47,9 @@ def send_help(message):
 
 @bot.message_handler(commands=['search'])
 def start_search(message):
-    procedure = unpack_data(DEFAULT_DATA)
+    procedure = util.loads(DEFAULT_DATA)
     bot.send_message(message.from_user.id, text.MSG_SEARCH,
-                     reply_markup=keyboard(procedure))
+                     reply_markup=direction_kboard(procedure))
 
 
 @bot.message_handler(commands=['aeroexp'])

@@ -9,11 +9,5 @@ It provides:
  - get timetables by directions
  - quickly find the Aeroexpress schedule
 
-## Installing
-To download using Git, type in the command line
-```
-git clone https://github.com/tohabyuraev/elka-schedule-bot
-```
-
 ## Authors
-* **Anthony Byuraev** - [tohabyuraev](https://github.com/tohabyuraev)
+**Anthony Byuraev** - [tohabyuraev](https://github.com/tohabyuraev)

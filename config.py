@@ -1,12 +1,9 @@
-"""
-config.py - set bot configuration
----
-"""
+'config.py - set bot configuration'
 
-DEFAULT_DATA = 'SEARCH:DIR:DEP:DES:0:None'
+KEYS = ('call', 'dir', 'dep', 'des', 'page', 'pages', 'date', 'acq')
 
-DIRECTION_DB = 'db/directions.json'
+DEFAULT_DATA = 'SEARCH'
 
-STATION_DB = 'db/stations.json'
+DATABASE = 'db/elka.db'
 
 SCHEME = 'https://ilyabirman.ru/projects/cppk-map/download/cppk-map-v164.pdf'

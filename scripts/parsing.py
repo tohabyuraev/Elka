@@ -1,60 +1,70 @@
-"""
-parsing.py - parsing web schedule data
----
-"""
+'parsing.py - parsing web schedule data'
 
-import json
 from datetime import datetime, timezone, timedelta
 
 import requests
 from bs4 import BeautifulSoup
 
+import scripts.database as database
+
 __author__ = 'Anthony Byuraev'
 
 
-STATION_DB = 'db/stations.json'
+def schedule_text(root: dict, lines: int = 3) -> str:
+    """
+    Builds schedule text with  departure, arrival and travel time:
 
+    Parameters:
+    -----------
+    root: dict
+        Commands and info
 
-def schedule_text(instructions: dict) -> str:
-    ROWS = 3
+    Returns:
+    --------
+    string: str
+        Schedule text
+
+    """
+
     LINK = (
         'https://www.tutu.ru/rasp.php?st1={}&st2={}&print=yes'
-        .format(instructions['dep'], instructions['des'])
+        .format(root['dep'], root['des'])
     )
 
     content = requests.get(LINK).content
     soup = BeautifulSoup(content, 'html.parser')
-    title = title_text(instructions)
 
     TZ_MSK = timezone(timedelta(hours=3))   # UTC+3
     time_now = str(datetime.now(TZ_MSK))[11:16]   # format: 'hh:mm'
 
-    dep_time_root = soup.tbody('div',
-                               attrs={'class': 'indication_gone_tooltip'})
-    dep_time = [time.a.text for time in dep_time_root]
-    buf = [time.a.text for time in dep_time_root if time.a.text >= time_now]
-    index = dep_time.index(buf[0])
+    deparure_time_array = soup.tbody(
+        'div', attrs={'class': 'indication_gone_tooltip'})
+    deparure_time = [time.a.text for time in deparure_time_array]
+    buf = [time.a.text
+           for time in deparure_time_array if time.a.text >= time_now]
+    index = deparure_time.index(buf[0])
 
-    des_time_root = soup.tbody('td', attrs={'style': 'white-space: normal;'})
-    des_time = [time.a.text for time in des_time_root]
+    destination_time_array = soup.tbody(
+        'td', attrs={'style': 'white-space: normal;'})
+    destination_time = [time.a.text for time in destination_time_array]
 
     # all stations
-    st_root = soup.tbody('td', attrs={'style': 'overflow:hidden !important;'})
-    st_from = [st.a.text for st in st_root[::2]]
-    st_to = [st.a.text for st in st_root[1::2]]
+    st_array = soup.tbody('td', attrs={'style': 'overflow:hidden !important;'})
+    st_from = [st.a.text for st in st_array[::2]]
+    st_to = [st.a.text for st in st_array[1::2]]
 
     schedule = [
         (
             '{} до отправления\n'
             '{}\n'
             '{} - {}\n\n'
-            .format(interval(time_now, dep_time[i]),
-                    center_text(dep_time[i], des_time[i]),
+            .format(interval(time_now, deparure_time[i]),
+                    center_text(deparure_time[i], destination_time[i]),
                     st_from[i], st_to[i])
         )
-        for i in range(index, index + ROWS)
+        for i in range(index, index + lines)
     ]
-    schedule.insert(0, title)
+    schedule.insert(0, title(root))
     return ''.join(schedule)
 
 
@@ -73,19 +83,11 @@ def center_text(time_from, time_to):
     return f'{time_from} - {interval(time_from, time_to)} - {time_to}'
 
 
-def title_text(instructions: dict) -> str:
-
-    direction = instructions['dir']
-    departure = int(instructions['dep'])
-    destination = int(instructions['des'])
-
-    with open(STATION_DB) as db:
-        data = json.load(db)
-        stations = data[direction]
-
-    name = {stations[key]['code']: stations[key]['name'] for key in stations}
+def title(root: dict) -> str:
+    station_from = database.station_name(root['dep'])
+    station_to = database.station_name(root['des'])
 
     return (
-        'Расписание от станции {} до станции {} с изменениями\n\n'
-        .format(name[departure], name[destination])
+        'Расписание от станции `{}` до станции `{}` со всеми изменениями\n\n'
+        .format(station_from, station_to)
     )

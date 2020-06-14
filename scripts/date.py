@@ -1,17 +1,15 @@
-"""
-date.py - Inline keyboard for travel date selection
----
-"""
+'date.py - Inline keyboard for travel date selection'
 
 import calendar
 from datetime import datetime, timedelta
 
 from telebot import TeleBot
-from telebot.types import (InlineKeyboardButton, InlineKeyboardMarkup,
+from telebot.types import (InlineKeyboardButton,
+                           InlineKeyboardMarkup,
                            CallbackQuery)
 
 import text
-from scripts.keyboard import keyboard
+from .keyboard import direction_kboard
 
 __author__ = 'Anthony Byuraev'
 
@@ -55,9 +53,7 @@ CALLS = (
 )
 
 
-def calendar_kboard(
-    year: int = None, month: int = None
-) -> InlineKeyboardMarkup:
+def calendar_kboard(year: int = None, month: int = None):
 
     now = datetime.utcnow()
     if year is None:
@@ -117,10 +113,18 @@ def calendar_kboard(
     return keyboard
 
 
-def create_months_calendar(year: int = None) -> InlineKeyboardMarkup:
+def create_months_calendar(year: int = None):
     """
     Creates a calendar with month selection
-    :param year
+
+    Parameters:
+    -----------
+    year: int
+
+    Returns:
+    --------
+    keyboard: InlineKeyboardMarkup
+
     """
 
     if year is None:
@@ -143,10 +147,9 @@ def create_months_calendar(year: int = None) -> InlineKeyboardMarkup:
     return keyboard
 
 
-def calendar_worker(bot: TeleBot, call: CallbackQuery) -> str:
+def calendar_worker(bot: TeleBot, call: CallbackQuery):
     """
     Creates a new calendar if the forward or backward button is pressed
-    This function should be called inside CallbackQueryHandler
     """
 
     procedure = unpack_data(call.data)
@@ -161,21 +164,14 @@ def calendar_worker(bot: TeleBot, call: CallbackQuery) -> str:
         bot.answer_callback_query(callback_query_id=call.id)
         return False, None
     elif procedure['call'] == "DAY":
-        # bot.delete_message(
-        #     chat_id=call.message.chat.id, message_id=call.message.message_id
-        # )
-        # bot.send_message(
-        #     chat_id=call.message.chat.id,
-        #     text=f'Выбрана дата {year}-{month}-{day}'
-        # )
         date = f'{day}.{month}.{year}'
-        callback_data = callback('SEARCH', 'DIR', 'DEP', 'DES', '0', date)
+        callback_data = callback('SEARCH', 'DIR', 'DEP', 'DES', '0', '0', date)
         procedure = unpack_kb_data(callback_data)
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=text.MSG_SEARCH,
-            reply_markup=keyboard(procedure)
+            reply_markup=direction_kboard(procedure)
         )
     elif procedure['call'] == "PREVIOUS-MONTH":
         preview_month = current - timedelta(days=1)
@@ -235,5 +231,5 @@ def unpack_data(data: str) -> dict:
 
 
 def unpack_kb_data(data: str) -> dict:
-    KEY_LIST_KB = ('call', 'dir', 'dep', 'des', 'page', 'date')
+    KEY_LIST_KB = ('call', 'dir', 'dep', 'des', 'page', 'pages', 'date')
     return dict(zip(KEY_LIST_KB, data.split(':')))

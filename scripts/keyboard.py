@@ -1,174 +1,206 @@
-"""
-keyboard.py - inline keyboards
----
-"""
+'keyboard.py - inline keyboards'
 
-import json
+from math import ceil
 
 from telebot import TeleBot
-from telebot.types import (InlineKeyboardMarkup, InlineKeyboardButton,
+from telebot.types import (InlineKeyboardMarkup,
+                           InlineKeyboardButton,
                            CallbackQuery)
 
 import text
-from config import DIRECTION_DB, STATION_DB
-from scripts.parsing import schedule_text
+import util
+import scripts.database as database
+from .parsing import schedule_text
 
 __author__ = 'Anthony Byuraev'
 
-__all__ = ['keyboard', 'keyboard_worker']
 
+def direction_kboard(root: dict, lines: int = 5):
+    """
+    Builds direction keyboard with directions column and pages selection bar:
+        direction1
+        direction2
+        ...
+        1 2 ...
 
-KEY_LIST = ('call', 'dir', 'dep', 'des', 'page', 'date')
-CALLS = ('SEARCH', 'DEPARTURE', 'DESTINATION', 'SCHEDULE')
+    Parameters:
+    -----------
+    root: dict
+        Commands
 
-MAX_LINES = 7
+    Returns:
+    --------
+    keyboard: InlineKeyboardMarkup
 
+    """
 
-def keyboard(instructions: dict) -> InlineKeyboardMarkup:
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    if instructions['call'] == 'SEARCH':
-        column, row = direction_kb(instructions)
-    else:
-        column, row = station_kb(instructions)
-    keyboard.add(*column)
-    keyboard.row(*row)
+    callback = {'call': 'DEPARTURE', 'acq': '1'}
+    callback['date'] = root.get('date', '')
+
+    keyboard = InlineKeyboardMarkup()
+
+    directions = database.get_directions_names()
+    directions_id = database.get_directions_ids()
+
+    root['pages'] = ceil(len(directions) / lines)  # not legal
+    page = int(root.get('page', '0'))
+
+    for i in range(lines * page, lines * page + lines):
+
+        callback['dir'] = directions_id[i]
+
+        keyboard.add(
+            InlineKeyboardButton(
+                directions[i], callback_data=util.dumps(callback)
+            )
+        )
+
+    bar = select_bar(root)
+    keyboard.row(*bar)
+
     return keyboard
 
 
-def direction_kb(instructions: dict) -> (list, list):
-    directions = db_data()
-    button_list = [
-        InlineKeyboardButton(
-            directions[direction]['name'],
-            callback_data=callback(instructions, direction))
-        for direction in directions
-    ]
-    column = split_list(button_list)
-    button_column = column[int(instructions['page'])]
-    button_row = [
-            InlineKeyboardButton(
-                select_numbers(instructions, i),
-                callback_data=select_callback(instructions, i)
-            )
-            for i in range(1, len(column) + 1)
-        ]
-    return button_column, button_row
-
-
-def station_kb(instructions: dict) -> (list, list):
-    stations = db_data(instructions['dir'])
-    button_list = [
-        InlineKeyboardButton(
-            stations[station]['name'],
-            callback_data=callback(instructions, stations[station]['code']))
-        for station in stations
-    ]
-    column = split_list(button_list)
-    button_column = column[int(instructions['page'])]
-    button_row = [
-            InlineKeyboardButton(
-                select_numbers(instructions, i),
-                callback_data=select_callback(instructions, i)
-            )
-            for i in range(1, len(column) + 1)
-        ]
-    return button_column, button_row
-
-
-def callback(instructions: dict, value) -> str:
-    out = instructions.copy()
-    value = str(value)
-    if instructions['call'] == 'SEARCH':
-        out['call'] = 'DEPARTURE'
-        out['dir'] = value
-        out['page'] = '0'
-    elif instructions['call'] == 'DEPARTURE':
-        out['call'] = 'DESTINATION'
-        out['dep'] = value
-    elif instructions['call'] == 'DESTINATION':
-        out['call'] = 'SCHEDULE'
-        out['des'] = value
-    return pack_data(out)
-
-
-def select_callback(instructions: dict, page_number: int) -> str:
-    out = instructions.copy()
-    out['page'] = str(page_number - 1)
-    return pack_data(out)
-
-
-def db_data(direction: str = None) -> dict:
+def station_kboard(root: dict, lines: int = 6):
     """
-    Load data from data base
+    Builds station keyboard with stations column and pages selection bar:
+        station1
+        station2
+        ...
+        1 2 ...
+
+    Parameters:
+    -----------
+    root: dict
+        Commands
+
+    Returns:
+    --------
+    keyboard: InlineKeyboardMarkup
+
     """
 
-    if direction is not None:
-        with open(STATION_DB) as db:
-            data = json.load(db)
-        return data[direction]
+    if root['call'] == 'DEPARTURE':
+        callback = {
+            'call': 'DESTINATION',
+            'dir': root.get('dir', '1'),
+            'date': root.get('date', ''),
+            'acq': '1'
+        }
+    elif root['call'] == 'DESTINATION':
+        callback = {
+            'call': 'SCHEDULE',
+            'dir': root.get('dir', '1'),
+            'dep': root.get('dep', '58708'),
+            'date': root.get('date', ''),
+            'acq': '1'
+        }
+
+    keyboard = InlineKeyboardMarkup()
+
+    stations = database.get_stations_names(root.get('dir', '1'))
+    stations_id = database.get_stations_ids(root.get('dir', '1'))
+
+    root['pages'] = ceil(len(stations) / lines)
+
+    if root.get('page') == '':
+        page = 0
     else:
-        with open(DIRECTION_DB) as db:
-            data = json.load(db)
-        return data
+        page = int(root.get('page', '0'))
+
+    for i in range(lines * page, lines * page + lines):
+
+        if root['call'] == 'DEPARTURE':
+            callback['dep'] = stations_id[i]
+        elif root['call'] == 'DESTINATION':
+            callback['des'] = stations_id[i]
+
+        keyboard.add(
+            InlineKeyboardButton(
+                stations[i], callback_data=util.dumps(callback)
+            )
+        )
+
+    bar = select_bar(root)
+    keyboard.row(*bar)
+
+    return keyboard
 
 
-def pack_data(data: dict) -> str:
-    """
-    Pack values to string with sep = ':' from instructions dict
-    """
-
-    callback = [value for value in data.values()]
-    return ':'.join(callback)
-
-
-def split_list(argument: list) -> list:
-    return [argument[i:i + MAX_LINES]
-            for i in range(0, len(argument), MAX_LINES)]
-
-
-def select_numbers(instructions: dict, page_number: int) -> str:
-    if int(instructions['page']) == page_number - 1:
-        return f'· {page_number} ·'
+def select_bar(root: dict) -> [InlineKeyboardButton, ...]:
+    pages = int(root.get('pages', '1'))
+    if root.get('page') == '':
+        page = 0
     else:
-        return f'{page_number}'
+        page = int(root.get('page', '0'))
+
+    bar = []
+
+    for i in range(pages):
+        if page == i:
+            callback = root.copy()
+            callback['page'] = i
+            callback['acq'] = '0'
+            button = InlineKeyboardButton(
+                f'· {i + 1} ·', callback_data=util.dumps(callback)
+            )
+            bar.append(button)
+        else:
+            callback = root.copy()
+            callback['page'] = i
+            callback['acq'] = '0'
+            button = InlineKeyboardButton(
+                f'{i + 1}', callback_data=util.dumps(callback)
+            )
+            bar.append(button)
+
+    return bar
 
 
-def schedule_kboard(instructions: dict) -> InlineKeyboardMarkup:
+def schedule_kboard(root: dict) -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup()
     update_button = InlineKeyboardButton(
         'Обновить расписание',
-        callback_data=pack_data(instructions)
+        callback_data=util.dumps(root)
     )
     keyboard.add(update_button)
     reversed_button = InlineKeyboardButton(
         'В обратном направлении',
-        callback_data=reversed_root(instructions)
+        callback_data=util.dumps(reversed_root(root))
     )
     keyboard.add(reversed_button)
     schedule_link_button = InlineKeyboardButton(
         'Расписание на tutu.ru',
-        url=get_url(instructions)
+        url=get_url(root)
     )
     keyboard.add(schedule_link_button)
     return keyboard
 
 
-def get_url(instructions: dict) -> str:
+def get_url(root: dict):
     """
     Return web page URL with train schedule
 
-    Powered by tutu.ru
+    Parameters:
+    -----------
+    root: dict
+        Commands
+
+    Returns:
+    --------
+    url: str
+
     """
     return (
         'https://www.tutu.ru/rasp.php?st1={}&st2={}'
-        .format(instructions['dep'], instructions['des'])
+        .format(root['dep'], root['des'])
     )
 
 
-def reversed_root(instructions: dict) -> str:
-    out = instructions.copy()
-    out['dep'], out['des'] = out['des'], out['dep']
-    return pack_data(out)
+def reversed_root(root: dict) -> dict:
+    rev_root = root.copy()
+    rev_root['dep'], rev_root['des'] = root['des'], root['dep']
+    return rev_root
 
 
 def keyboard_worker(bot: TeleBot, call: CallbackQuery) -> None:
@@ -176,41 +208,45 @@ def keyboard_worker(bot: TeleBot, call: CallbackQuery) -> None:
     Check for callback for this script
     """
 
-    procedure = unpack_data(call.data)
+    procedure = util.loads(call.data)
 
     if procedure['call'] == 'SEARCH':
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=text.MSG_SEARCH,
-            reply_markup=keyboard(procedure)
+            reply_markup=direction_kboard(procedure)
         )
     elif procedure['call'] == 'DEPARTURE':
-        bot.answer_callback_query(call.id, 'Направление выбрано')
+        if procedure['acq'] == '1':
+            bot.answer_callback_query(call.id, 'Направление выбрано')
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text='Выбери станцию отправления:',
-            reply_markup=keyboard(procedure)
+            reply_markup=station_kboard(procedure)
         )
     elif procedure['call'] == 'DESTINATION':
-        bot.answer_callback_query(call.id, 'Станция отправления выбрана')
+        if procedure['acq'] == '1':
+            bot.answer_callback_query(call.id, 'Станция отправления выбрана')
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text='Выбери станцию назначения:',
-            reply_markup=keyboard(procedure)
+            reply_markup=station_kboard(procedure)
         )
-    elif procedure['call'] == 'SCHEDULE' and procedure['date'] == 'None':
-        bot.answer_callback_query(call.id, 'Станция назначения выбрана')
+    elif procedure['call'] == 'SCHEDULE' and procedure['date'] == '':
+        if procedure['acq'] == '1':
+            bot.answer_callback_query(call.id, 'Станция назначения выбрана')
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=schedule_text(procedure),
             reply_markup=schedule_kboard(procedure)
         )
-    elif procedure['call'] == 'SCHEDULE' and procedure['date'] != 'None':
-        bot.answer_callback_query(call.id, 'Станция назначения выбрана')
+    elif procedure['call'] == 'SCHEDULE' and procedure['date'] != '':
+        if procedure['acq'] == '1':
+            bot.answer_callback_query(call.id, 'Станция назначения выбрана')
         bot.delete_message(
             chat_id=call.message.chat.id, message_id=call.message.message_id
         )
@@ -231,7 +267,3 @@ def keyboard_worker(bot: TeleBot, call: CallbackQuery) -> None:
             text='Держи расписание!',
             reply_markup=date_keyboard
         )
-
-
-def unpack_data(data: str) -> dict:
-    return dict(zip(KEY_LIST, data.split(':')))
