@@ -3,91 +3,86 @@
 from datetime import datetime, timezone, timedelta
 
 import requests
-from bs4 import BeautifulSoup
+from lxml import html
 
-import scripts.database as database
+from .database import station_name
 
 __author__ = 'Anthony Byuraev'
 
 
-def schedule_text(root: dict, lines: int = 3) -> str:
+title = (
+    'Расписание от станции {0} до станции {1} со всеми изменениями\n\n'
+)
+body = (
+    '{before} до отправления\n'
+    '{time_from} - {root_time} - {time_to}\n'
+    '{root_from} - {root_to}\n\n'
+)
+
+
+def schedule(root: dict, lines: int = 3) -> str:
     """
-    Builds schedule text with  departure, arrival and travel time:
-
-    Parameters:
-    -----------
-    root: dict
-        Commands and info
-
-    Returns:
-    --------
-    string: str
-        Schedule text
-
+    Builds schedule with departure, arrival and travel time
     """
+    DEPARTURE = station_name(root['dep'])
+    DESTINATION = station_name(root['des'])
 
-    LINK = (
-        'https://www.tutu.ru/rasp.php?st1={}&st2={}&print=yes'
-        .format(root['dep'], root['des'])
-    )
+    URL_BASE = 'https://www.tutu.ru/rasp.php'
+    URL_PATH = '?st1={}&st2={}'.format(root['dep'], root['des'])
+    URL = URL_BASE + URL_PATH
 
-    content = requests.get(LINK).content
-    soup = BeautifulSoup(content, 'html.parser')
+    content = requests.get(URL).content
+    data = html.fromstring(content)
 
     TZ_MSK = timezone(timedelta(hours=3))   # UTC+3
-    time_now = str(datetime.now(TZ_MSK))[11:16]   # format: 'hh:mm'
+    now = str(datetime.now(TZ_MSK))[11:16]   # format: 'hh:mm'
 
-    deparure_time_array = soup.tbody(
-        'div', attrs={'class': 'indication_gone_tooltip'})
-    deparure_time = [time.a.text for time in deparure_time_array]
-    buf = [time.a.text
-           for time in deparure_time_array if time.a.text >= time_now]
-    index = deparure_time.index(buf[0])
-
-    destination_time_array = soup.tbody(
-        'td', attrs={'style': 'white-space: normal;'})
-    destination_time = [time.a.text for time in destination_time_array]
-
-    # all stations
-    st_array = soup.tbody('td', attrs={'style': 'overflow:hidden !important;'})
-    st_from = [st.a.text for st in st_array[::2]]
-    st_to = [st.a.text for st in st_array[1::2]]
-
-    schedule = [
-        (
-            '{} до отправления\n'
-            '{}\n'
-            '{} - {}\n\n'
-            .format(interval(time_now, deparure_time[i]),
-                    center_text(deparure_time[i], destination_time[i]),
-                    st_from[i], st_to[i])
-        )
-        for i in range(index, index + lines)
+    time_from = [
+        item.text
+        for item in data.find_class('g-link desktop__depTimeLink__1NA_N')
+        # indication_gone_tooltip
     ]
-    schedule.insert(0, title(root))
-    return ''.join(schedule)
+    time_to = [
+        item.text
+        for item in data.find_class('g-link desktop__arrTimeLink__2TJxM')
+        # white-space: normal;
+    ]
+    root = [
+        item.text
+        for item in data.find_class('g-link desktop__routeLink__J643d')
+        # overflow:hidden !important;
+    ]
+    root_from = root[::2]
+    root_to = root[1::2]
+
+    find = [time for time in time_from if time >= now][0]
+    position = time_from.index(find)
+
+    time_from = time_from[position:]
+    time_to = time_to[position:]
+    root_from = root_from[position:]
+    root_to = root_to[position:]
+
+    schedule = title.format(DEPARTURE, DESTINATION)
+
+    for i in range(lines):
+        schedule += body.format(
+            before=interval(now, time_from[i]),
+            time_from=time_from[i],
+            root_time=interval(time_from[i], time_to[i]),
+            time_to=time_to[i],
+            root_from=root_from[i],
+            root_to=root_to[i]
+        )
+    return schedule
 
 
-def interval(time_from, time_to) -> str:
-    now_minutes = int(time_from[:2]) * 60 + int(time_from[-2:])
-    dep_minutes = int(time_to[:2]) * 60 + int(time_to[-2:])
+def interval(start: str, stop: str) -> str:
+    now_minutes = int(start[:2]) * 60 + int(start[-2:])
+    dep_minutes = int(stop[:2]) * 60 + int(stop[-2:])
     hours = (dep_minutes - now_minutes) // 60
     minutes = (dep_minutes - now_minutes) % 60
     if hours:
         return f'{hours} ч {minutes} мин'
     else:
         return f'{minutes} мин'
-
-
-def center_text(time_from, time_to):
-    return f'{time_from} - {interval(time_from, time_to)} - {time_to}'
-
-
-def title(root: dict) -> str:
-    station_from = database.station_name(root['dep'])
-    station_to = database.station_name(root['des'])
-
-    return (
-        'Расписание от станции `{}` до станции `{}` со всеми изменениями\n\n'
-        .format(station_from, station_to)
-    )

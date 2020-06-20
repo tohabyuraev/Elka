@@ -10,7 +10,7 @@ from telebot.types import (InlineKeyboardMarkup,
 import text
 import util
 import scripts.database as database
-from .parsing import schedule_text
+from .parsing import schedule
 
 __author__ = 'Anthony Byuraev'
 
@@ -241,7 +241,7 @@ def keyboard_worker(bot: TeleBot, call: CallbackQuery) -> None:
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text=schedule_text(procedure),
+            text=schedule(procedure),
             reply_markup=schedule_kboard(procedure)
         )
     elif procedure['call'] == 'SCHEDULE' and procedure['date'] != '':
