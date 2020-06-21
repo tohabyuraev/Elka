@@ -55,21 +55,24 @@ def schedule(root: dict, lines: int = 3) -> str:
     root_from = root[::2]
     root_to = root[1::2]
 
-    find = [time for time in time_from if time >= now][0]
-    position = time_from.index(find)
+    if len(time_from) >= lines:
+        find = [time for time in time_from if time >= now][0]
+        position = time_from.index(find)
 
-    time_from = time_from[position:]
-    time_to = time_to[position:]
-    root_from = root_from[position:]
-    root_to = root_to[position:]
+        time_from = time_from[position:position + lines]
+        time_to = time_to[position:position + lines]
+        root_from = root_from[position:position + lines]
+        root_to = root_to[position:position + lines]
+    else:
+        pass
 
     schedule = title.format(DEPARTURE, DESTINATION)
 
-    for i in range(lines):
+    for i, time_from in enumerate(time_from):
         schedule += body.format(
-            before=interval(now, time_from[i]),
-            time_from=time_from[i],
-            root_time=interval(time_from[i], time_to[i]),
+            before=interval(now, time_from),
+            time_from=time_from,
+            root_time=interval(time_from, time_to[i]),
             time_to=time_to[i],
             root_from=root_from[i],
             root_to=root_to[i]

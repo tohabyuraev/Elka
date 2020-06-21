@@ -22,16 +22,6 @@ def direction_kboard(root: dict, lines: int = 5):
         direction2
         ...
         1 2 ...
-
-    Parameters:
-    -----------
-    root: dict
-        Commands
-
-    Returns:
-    --------
-    keyboard: InlineKeyboardMarkup
-
     """
 
     callback = {'call': 'DEPARTURE', 'acq': '1'}
@@ -61,23 +51,13 @@ def direction_kboard(root: dict, lines: int = 5):
     return keyboard
 
 
-def station_kboard(root: dict, lines: int = 6):
+def station_kboard(root: dict, lines: int = 8):
     """
     Builds station keyboard with stations column and pages selection bar:
         station1
         station2
         ...
         1 2 ...
-
-    Parameters:
-    -----------
-    root: dict
-        Commands
-
-    Returns:
-    --------
-    keyboard: InlineKeyboardMarkup
-
     """
 
     if root['call'] == 'DEPARTURE':
@@ -177,19 +157,9 @@ def schedule_kboard(root: dict) -> InlineKeyboardMarkup:
     return keyboard
 
 
-def get_url(root: dict):
+def get_url(root: dict) -> str:
     """
     Return web page URL with train schedule
-
-    Parameters:
-    -----------
-    root: dict
-        Commands
-
-    Returns:
-    --------
-    url: str
-
     """
     return (
         'https://www.tutu.ru/rasp.php?st1={}&st2={}'

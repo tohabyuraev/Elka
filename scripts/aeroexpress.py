@@ -23,7 +23,7 @@ def aeroexpress_kboard() -> InlineKeyboardMarkup:
     keyboard.add(key_sheremetyevo)
 
     callback = {
-        'call': 'AEROEXPRESS', 'dep': '83511', 'des': '83511', 'acq': '1'}
+        'call': 'AEROEXPRESS', 'dep': '83511', 'des': '87511', 'acq': '1'}
     key_domodedovo = InlineKeyboardButton(
         text='В аэропорт Домодедово',
         callback_data=util.dumps(callback)
