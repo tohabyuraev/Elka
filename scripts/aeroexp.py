@@ -1,13 +1,17 @@
 'aeroexpress.py - special module for "aeroexp" command'
 
-from telebot import TeleBot
-from telebot.types import (InlineKeyboardMarkup,
-                           InlineKeyboardButton,
-                           CallbackQuery)
-
-import util
-
 __author__ = 'Anthony Byuraev'
+
+from telebot import TeleBot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import CallbackQuery
+
+import utils
+
+
+CALLS = (
+    'AEROEXPRESS',
+)
 
 
 def aeroexpress_kboard() -> InlineKeyboardMarkup:
@@ -15,28 +19,37 @@ def aeroexpress_kboard() -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup()
 
     callback = {
-        'call': 'AEROEXPRESS', 'dep': '28604', 'des': '35804', 'acq': '1'}
+        'call': 'AEROEXPRESS', 'sfrom': '28604', 'sto': '35804', 'acq': '1'}
     key_sheremetyevo = InlineKeyboardButton(
         text='В аэропорт Шереметьево',
-        callback_data=util.dumps(callback)
+        callback_data=utils.dumps(callback)
     )
     keyboard.add(key_sheremetyevo)
 
     callback = {
-        'call': 'AEROEXPRESS', 'dep': '83511', 'des': '87511', 'acq': '1'}
+        'call': 'AEROEXPRESS', 'sfrom': '83511', 'sto': '87511', 'acq': '1'}
     key_domodedovo = InlineKeyboardButton(
         text='В аэропорт Домодедово',
-        callback_data=util.dumps(callback)
+        callback_data=utils.dumps(callback)
     )
     keyboard.add(key_domodedovo)
 
     callback = {
-        'call': 'AEROEXPRESS', 'dep': '16503', 'des': '77103', 'acq': '1'}
+        'call': 'AEROEXPRESS', 'sfrom': '16503', 'sto': '77103', 'acq': '1'}
     key_vnukovo = InlineKeyboardButton(
         text='В аэропорт Внуково',
-        callback_data=util.dumps(callback)
+        callback_data=utils.dumps(callback)
     )
     keyboard.add(key_vnukovo)
+
+    callback = {
+        'call': 'CANCEL'
+    }
+    remove_button = InlineKeyboardButton(
+        text='Отмена',
+        callback_data=utils.dumps(callback)
+    )
+    keyboard.add(remove_button)
 
     return keyboard
 
@@ -53,7 +66,7 @@ def schedule_kboard(root: dict) -> InlineKeyboardMarkup:
 
     airport_link_button = InlineKeyboardButton(
         text='Сайт аэропорта',
-        url=airport_url(root['des'])
+        url=airport_url(root['sto'])
     )
     keyboard.add(airport_link_button)
 
@@ -63,7 +76,7 @@ def schedule_kboard(root: dict) -> InlineKeyboardMarkup:
 def schedule_url(root: dict) -> str:
     return (
         'https://www.tutu.ru/rasp.php?st1={}&st2={}'
-        .format(root['dep'], root['des'])
+        .format(root['sfrom'], root['sto'])
     )
 
 
@@ -78,7 +91,7 @@ def airport_url(station_code: str) -> str:
 
 def aeroexpress_worker(bot: TeleBot, call: CallbackQuery):
 
-    procedure = util.loads(call.data)
+    procedure = utils.loads(call.data)
 
     if procedure['call'] == 'AEROEXPRESS':
         if procedure['acq'] == '1':

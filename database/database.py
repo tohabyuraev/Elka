@@ -1,10 +1,9 @@
+__author__ = 'Anthony Byuraev'
+
 import re
 import sqlite3
 
-# from config import DATABASE
-DATABASE = 'db/elka.db'
-
-__author__ = 'Anthony Byuraev'
+from config import DATABASE
 
 
 def get_directions_names() -> [str, ...]:

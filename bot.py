@@ -1,8 +1,6 @@
 #!/usr/bin/env python
-"""
-bot.py - the main bot file
----
-"""
+
+__author__ = 'Anthony Byuraev'
 
 import os
 import logging
@@ -12,13 +10,13 @@ from flask import Flask, request
 from telebot.types import Update
 
 import text
-import util
-from config import DEFAULT_DATA, SCHEME
+import utils
+from config import DEFAULT_ONE, DEFAULT_DIFF, SCHEME
+from scripts.one import one_dir_kb, one_worker
+from scripts.diff import diff_dir_kb, diff_worker
 from scripts.date import calendar_kboard, calendar_worker
-from scripts.keyboard import direction_kboard, keyboard_worker
-from scripts.aeroexpress import aeroexpress_kboard, aeroexpress_worker
+from scripts.aeroexp import aeroexpress_kboard, aeroexpress_worker
 
-__author__ = 'Anthony Byuraev'
 
 
 WEBHOOK_HOST = str(os.getenv('HOST'))
@@ -45,22 +43,29 @@ def send_help(message):
     bot.send_message(message.from_user.id, text.MSG_HELP)
 
 
-@bot.message_handler(commands=['search'])
-def start_search(message):
-    procedure = util.loads(DEFAULT_DATA)
+@bot.message_handler(commands=['scheme'])
+def send_scheme(message):
+    bot.send_document(message.from_user.id, SCHEME)
+
+
+@bot.message_handler(commands=['one'])
+def start_search_one(message):
+    procedure = utils.loads(DEFAULT_ONE)
     bot.send_message(message.from_user.id, text.MSG_SEARCH,
-                     reply_markup=direction_kboard(procedure))
+                     reply_markup=one_dir_kb(procedure))
+
+
+@bot.message_handler(commands=['diff'])
+def start_search_diff(message):
+    procedure = utils.loads(DEFAULT_DIFF)
+    bot.send_message(message.from_user.id, text.MSG_SEARCH,
+                     reply_markup=diff_dir_kb(procedure))
 
 
 @bot.message_handler(commands=['aeroexp'])
 def aeroexpress_search(message):
     bot.send_message(message.from_user.id, text.MSG_AERO,
                      reply_markup=aeroexpress_kboard())
-
-
-@bot.message_handler(commands=['scheme'])
-def send_scheme(message):
-    bot.send_document(message.from_user.id, SCHEME)
 
 
 @bot.message_handler(commands=['calendar'])
@@ -79,7 +84,14 @@ def send_text_message(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
-    keyboard_worker(bot, call)
+    procedure = utils.loads(call.data)
+    if procedure['call'] in ('DELETE', 'CANCEL'):
+        bot.delete_message(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id
+        )
+    one_worker(bot, call)
+    diff_worker(bot, call)
     aeroexpress_worker(bot, call)
     calendar_worker(bot, call)
 

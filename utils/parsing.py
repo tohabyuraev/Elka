@@ -1,17 +1,17 @@
 'parsing.py - parsing web schedule data'
 
+__author__ = 'Anthony Byuraev'
+
 from datetime import datetime, timezone, timedelta
 
 import requests
 from lxml import html
 
-from .database import station_name
-
-__author__ = 'Anthony Byuraev'
+from database.database import station_name
 
 
 title = (
-    'Расписание от станции {0} до станции {1} со всеми изменениями\n\n'
+    'Расписание от станции "{0}" до станции "{1}" со всеми изменениями\n\n'
 )
 body = (
     '{before} до отправления\n'
@@ -24,11 +24,11 @@ def schedule(root: dict, lines: int = 3) -> str:
     """
     Builds schedule with departure, arrival and travel time
     """
-    DEPARTURE = station_name(root['dep'])
-    DESTINATION = station_name(root['des'])
+    DEPARTURE = station_name(root['sfrom'])
+    DESTINATION = station_name(root['sto'])
 
     URL_BASE = 'https://www.tutu.ru/rasp.php'
-    URL_PATH = '?st1={}&st2={}'.format(root['dep'], root['des'])
+    URL_PATH = '?st1={}&st2={}'.format(root['sfrom'], root['sto'])
     URL = URL_BASE + URL_PATH
 
     content = requests.get(URL).content

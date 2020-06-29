@@ -1,17 +1,16 @@
 'date.py - Inline keyboard for travel date selection'
 
+__author__ = 'Anthony Byuraev'
+
 import calendar
 from datetime import datetime, timedelta
 
 from telebot import TeleBot
-from telebot.types import (InlineKeyboardButton,
-                           InlineKeyboardMarkup,
-                           CallbackQuery)
+from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
+from telebot.types import CallbackQuery
 
 import text
-from .keyboard import direction_kboard
-
-__author__ = 'Anthony Byuraev'
+from scripts.one import one_dir_kb
 
 
 MONTHS_ENG = (
@@ -46,10 +45,19 @@ MONTHS = (
 DAYS_ENG = ("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 DAYS = ("Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб")
 
-KEY_LIST = ('call', 'year', 'month', 'day')
+KEY_LIST = (
+    'call',
+    'year',
+    'month',
+    'day',
+)
 CALLS = (
-    'IGNORE', 'MONTHS', 'MONTH', 'DAY',
-    'PREVIOUS-MONTH', 'NEXT-MONTH', 'CANCEL'
+    'DAY',
+    'MONTH',
+    'MONTHS',
+    'IGNORE',
+    'NEXT-MONTH',
+    'PREVIOUS-MONTH',
 )
 
 
@@ -171,7 +179,7 @@ def calendar_worker(bot: TeleBot, call: CallbackQuery):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=text.MSG_SEARCH,
-            reply_markup=direction_kboard(procedure)
+            reply_markup=one_dir_kb(procedure)
         )
     elif procedure['call'] == "PREVIOUS-MONTH":
         preview_month = current - timedelta(days=1)
@@ -213,11 +221,6 @@ def calendar_worker(bot: TeleBot, call: CallbackQuery):
             reply_markup=calendar_kboard(year=int(year), month=int(month)),
         )
         return None
-    elif procedure['call'] == "CANCEL":
-        bot.delete_message(
-            chat_id=call.message.chat.id, message_id=call.message.message_id
-        )
-        return "CANCEL", None
 
 
 def callback(*args) -> str:
