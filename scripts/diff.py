@@ -24,7 +24,7 @@ from telebot.types import CallbackQuery
 
 import text
 import utils
-from database import database
+from database import elka_db
 from utils.parsing import schedule
 
 
@@ -58,8 +58,8 @@ def diff_dir_kb(root: dict, lines: int = 5):
 
     keyboard = InlineKeyboardMarkup()
 
-    directions = database.get_directions_names()
-    directions_id = database.get_directions_ids()
+    directions = elka_db.direction.name_()
+    directions_id = elka_db.direction.id_()
 
     root['pages'] = ceil(len(directions) / lines)  # not legal
 
@@ -104,19 +104,19 @@ def station_kboard(root: dict, lines: int = 8):
         callback = {
             'call': 'DIFF_SCHEDULE',
             'dfrom': root.get('dfrom', '1'),
-            'dto': root.get('dto', '1'),
             'sfrom': root.get('sfrom', '58708'),
+            'dto': root.get('dto', '1'),
             'acq': '1',
         }
 
     keyboard = InlineKeyboardMarkup()
 
     if cond_st_from:
-        stations = database.get_stations_names(root.get('dfrom', '1'))
-        stations_id = database.get_stations_ids(root.get('dfrom', '1'))
+        stations = elka_db.station.name_(root.get('dfrom', '1'))
+        stations_id = elka_db.station.id_(root.get('dfrom', '1'))
     elif cond_st_to:
-        stations = database.get_stations_names(root.get('dto', '1'))
-        stations_id = database.get_stations_ids(root.get('dto', '1'))
+        stations = elka_db.station.name_(root.get('dto', '1'))
+        stations_id = elka_db.station.id_(root.get('dto', '1'))
 
     root['pages'] = ceil(len(stations) / lines)
 

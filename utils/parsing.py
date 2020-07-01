@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 import requests
 from lxml import html
 
-from database.database import station_name
+from database import elka_db
 
 
 title = (
@@ -24,8 +24,8 @@ def schedule(root: dict, lines: int = 3) -> str:
     """
     Builds schedule with departure, arrival and travel time
     """
-    DEPARTURE = station_name(root['sfrom'])
-    DESTINATION = station_name(root['sto'])
+    DEPARTURE = elka_db.station.name_(id=root['sfrom']).pop()
+    DESTINATION = elka_db.station.name_(id=root['sto']).pop()
 
     URL_BASE = 'https://www.tutu.ru/rasp.php'
     URL_PATH = '?st1={}&st2={}'.format(root['sfrom'], root['sto'])

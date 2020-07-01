@@ -11,8 +11,9 @@ from telebot.types import Update
 
 import text
 import utils
-from config import DEFAULT_ONE, DEFAULT_DIFF, SCHEME
+from config import DEFAULT_ONE, DEFAULT_DIFF, DEFAULT_MCD, SCHEME
 from scripts.one import one_dir_kb, one_worker
+from scripts.mcd import mcd_dir_kb, mcd_worker
 from scripts.diff import diff_dir_kb, diff_worker
 from scripts.date import calendar_kboard, calendar_worker
 from scripts.aeroexp import aeroexpress_kboard, aeroexpress_worker
@@ -55,6 +56,13 @@ def start_search_one(message):
                      reply_markup=one_dir_kb(procedure))
 
 
+@bot.message_handler(commands=['mcd'])
+def start_search_diff(message):
+    procedure = utils.loads(DEFAULT_MCD)
+    bot.send_message(message.from_user.id, text.MSG_SEARCH,
+                     reply_markup=mcd_dir_kb(procedure))
+
+
 @bot.message_handler(commands=['diff'])
 def start_search_diff(message):
     procedure = utils.loads(DEFAULT_DIFF)
@@ -91,6 +99,7 @@ def callback_worker(call):
             message_id=call.message.message_id
         )
     one_worker(bot, call)
+    mcd_worker(bot, call)
     diff_worker(bot, call)
     aeroexpress_worker(bot, call)
     calendar_worker(bot, call)

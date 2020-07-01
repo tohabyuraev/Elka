@@ -1,5 +1,5 @@
 """
-one.py - script for 'one' command
+mcd.py - script for 'mcd' command
 
 Direction keyboard example:
 first  direction
@@ -29,44 +29,40 @@ from utils.parsing import schedule
 
 
 CALLS = (
-    'SEARCH',
-    'DEPARTURE',
-    'DESTINATION',
-    'SCHEDULE',
+    'MCD_SEARCH',
+    'MCD_DEPARTURE',
+    'MCD_DESTINATION',
+    'MCD_SCHEDULE',
 )
 
 
-def one_dir_kb(root: dict, lines: int = 5):
+def mcd_dir_kb(root: dict):
     """
     Builds direction keyboard with directions column and pages selection bar
     """
-
     callback = {
-        'call': 'DEPARTURE',
+        'call': 'MCD_DEPARTURE',
         'acq': '1',
     }
-    callback['date'] = root.get('date', '')
 
     keyboard = InlineKeyboardMarkup()
 
-    directions = elka_db.direction.name_()
-    directions_id = elka_db.direction.id_()
+    directions = elka_db.mcd.name_()
+    directions_id = elka_db.mcd.id_()
 
-    root['pages'] = ceil(len(directions) / lines)  # not legal
-    page = int(root.get('page', '0'))
+    callback['dfrom'] = directions_id[0]
+    mcd1_button = InlineKeyboardButton(
+        text=directions[0],
+        callback_data=utils.dumps(callback)
+    )
 
-    for i in range(lines * page, lines * page + lines):
-
-        callback['dfrom'] = directions_id[i]
-
-        keyboard.add(
-            InlineKeyboardButton(
-                directions[i], callback_data=utils.dumps(callback)
-            )
-        )
-
-    bar = select_bar(root)
-    keyboard.row(*bar)
+    callback['dfrom'] = directions_id[1]
+    mcd2_button = InlineKeyboardButton(
+        text=directions[1],
+        callback_data=utils.dumps(callback)
+    )
+    keyboard.add(mcd1_button)
+    keyboard.add(mcd2_button)
 
     return keyboard
 
@@ -75,29 +71,27 @@ def station_kboard(root: dict, lines: int = 8):
     """
     Builds station keyboard with stations column and pages selection bar
     """
-    cond_dep = root['call'] == 'DEPARTURE'
-    cond_des = root['call'] == 'DESTINATION'
+    cond_dep = root['call'] == 'MCD_DEPARTURE'
+    cond_des = root['call'] == 'MCD_DESTINATION'
 
     if cond_dep:
         callback = {
-            'call': 'DESTINATION',
+            'call': 'MCD_DESTINATION',
             'dfrom': root.get('dfrom', '1'),
-            'date': root.get('date', ''),
             'acq': '1',
         }
     elif cond_des:
         callback = {
-            'call': 'SCHEDULE',
+            'call': 'MCD_SCHEDULE',
             'dfrom': root.get('dfrom', '1'),
             'sfrom': root.get('sfrom', '58708'),
-            'date': root.get('date', ''),
             'acq': '1',
         }
 
     keyboard = InlineKeyboardMarkup()
 
-    stations = elka_db.station.name_(root.get('dfrom', '1'))
-    stations_id = elka_db.station.id_(root.get('dfrom', '1'))
+    stations = elka_db.mcd_station.name_(root.get('dfrom', '1'))
+    stations_id = elka_db.mcd_station.id_(root.get('dfrom', '1'))
 
     root['pages'] = ceil(len(stations) / lines)
 
@@ -106,8 +100,13 @@ def station_kboard(root: dict, lines: int = 8):
     else:
         page = int(root.get('page', '0'))
 
-    for i in range(lines * page, lines * page + lines):
+    start = lines * page
+    if lines * page + lines > len(stations):
+        stop = len(stations)
+    else:
+        stop = lines * page + lines
 
+    for i in range(start, stop):
         if cond_dep:
             callback['sfrom'] = stations_id[i]
         elif cond_des:
@@ -191,21 +190,21 @@ def reversed_root(root: dict) -> dict:
     return rev_root
 
 
-def one_worker(bot: TeleBot, call: CallbackQuery) -> None:
+def mcd_worker(bot: TeleBot, call: CallbackQuery) -> None:
     """
     Check for callback for this script
     """
 
     procedure = utils.loads(call.data)
 
-    if procedure['call'] == 'SEARCH':
+    if procedure['call'] == 'MCD_SEARCH':
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=text.MSG_SEARCH,
-            reply_markup=one_dir_kb(procedure)
+            reply_markup=mcd_dir_kb(procedure)
         )
-    elif procedure['call'] == 'DEPARTURE':
+    elif procedure['call'] == 'MCD_DEPARTURE':
         if procedure['acq'] == '1':
             bot.answer_callback_query(call.id, 'Направление выбрано')
         bot.edit_message_text(
@@ -214,7 +213,7 @@ def one_worker(bot: TeleBot, call: CallbackQuery) -> None:
             text='Выбери станцию отправления:',
             reply_markup=station_kboard(procedure)
         )
-    elif procedure['call'] == 'DESTINATION':
+    elif procedure['call'] == 'MCD_DESTINATION':
         if procedure['acq'] == '1':
             bot.answer_callback_query(call.id, 'Станция отправления выбрана')
         bot.edit_message_text(
@@ -223,7 +222,7 @@ def one_worker(bot: TeleBot, call: CallbackQuery) -> None:
             text='Выбери станцию назначения:',
             reply_markup=station_kboard(procedure)
         )
-    elif procedure['call'] == 'SCHEDULE' and procedure['date'] == '':
+    elif procedure['call'] == 'MCD_SCHEDULE':
         if procedure['acq'] == '1':
             bot.answer_callback_query(call.id, 'Станция назначения выбрана')
         bot.edit_message_text(
@@ -231,27 +230,4 @@ def one_worker(bot: TeleBot, call: CallbackQuery) -> None:
             message_id=call.message.message_id,
             text=schedule(procedure),
             reply_markup=schedule_kboard(procedure)
-        )
-    elif procedure['call'] == 'SCHEDULE' and procedure['date'] != '':
-        if procedure['acq'] == '1':
-            bot.answer_callback_query(call.id, 'Станция назначения выбрана')
-        bot.delete_message(
-            chat_id=call.message.chat.id, message_id=call.message.message_id
-        )
-        URL = (
-            'https://www.tutu.ru/rasp.php?st1={}&st2={}&date={}'
-            .format(procedure['sfrom'], procedure['sto'],
-                    procedure['date'])
-        )
-        date_keyboard = InlineKeyboardMarkup()
-        date_keyboard.add(
-            InlineKeyboardButton(
-                'Расписание на tutu.ru',
-                url=URL
-            )
-        )
-        bot.send_message(
-            chat_id=call.message.chat.id,
-            text='Держи расписание!',
-            reply_markup=date_keyboard
         )
