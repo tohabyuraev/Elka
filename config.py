@@ -1,9 +1,24 @@
-'config.py - set bot configuration'
+﻿"""
+config.py - set bot configuration
+"""
 
-KEYS = ('call', 'dfrom', 'dto', 'sfrom', 'sto', 'page', 'pages', 'date', 'acq')
+__author__ = 'Anthony Byuraev'
 
-DEFAULT_ONE = 'SEARCH'
-DEFAULT_DIFF = 'DIRECTION_FROM'
-DEFAULT_MCD = 'MCD_SEARCH'
+from aiogram.types import BotCommand
 
-SCHEME = 'https://ilyabirman.ru/projects/cppk-map/download/cppk-map-v164.pdf'
+
+KEYS = ('call', 'dir', 'sfrom', 'sto', 'page', 'date')
+
+DEFAULT_MCD = 'DIR'
+DEFAULT_SEARCH = 'SEARCH'
+DEFAULT_AEROEXP = 'AEROEXP'
+
+SCHEME = 'BQACAgQAAxkDAAIGNF8QlXZ76NGg0nZ7cggTkt_Ny4lPAAI5AgACZU-MUFKldvsvF0dIGgQ'
+
+COMMANDS = [
+    BotCommand('help', 'подробнее о командах'),
+    BotCommand('search', 'расписание электричек'),
+    BotCommand('mcd', 'расписание поездов МЦД'),
+    BotCommand('aeroexp', 'расписание Aeroexpress'),
+    BotCommand('scheme', 'схема пригородного сообщения'),
+]

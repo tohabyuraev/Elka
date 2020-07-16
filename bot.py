@@ -1,120 +1,115 @@
-#!/usr/bin/env python
-
 __author__ = 'Anthony Byuraev'
 
 import os
-import logging
 
-import telebot
-from flask import Flask, request
-from telebot.types import Update
+import typing
+import logging
+import asyncio
+
+from aiogram import Bot, types
+from aiogram.utils import executor
+from aiogram.dispatcher import Dispatcher
 
 import text
-import utils
-from config import DEFAULT_ONE, DEFAULT_DIFF, DEFAULT_MCD, SCHEME
-from scripts.one import one_dir_kb, one_worker
-from scripts.mcd import mcd_dir_kb, mcd_worker
-from scripts.diff import diff_dir_kb, diff_worker
-from scripts.date import calendar_kboard, calendar_worker
-from scripts.aeroexp import aeroexpress_kboard, aeroexpress_worker
+import util
+import config
+from scripts.mcd import mcd_direction_kboard, mcd_worker
+from scripts.search import search_table, search_worker
+# from scripts.date import calendar_kboard, calendar_worker
+from scripts.aeroexp import aeroexp_kboard, aeroexp_worker
 
-
-
-WEBHOOK_HOST = str(os.getenv('HOST'))
-WEBHOOK_PORT = int(os.environ.get('PORT', '8443'))
-WEBHOOK_LISTEN = '0.0.0.0'
 
 TOKEN = os.getenv('TOKEN')
 
-server = Flask(__name__)
+WEBHOOK_HOST = os.getenv('HOST')
+WEBHOOK_PATH = f'/webhook/bot/{TOKEN}'
+WEBHOOK_URL = f'{WEBHOOK_HOST}{WEBHOOK_PATH}'
 
-bot = telebot.TeleBot(TOKEN)
-
-logger = telebot.logger
-telebot.logger.setLevel(logging.INFO)
-
-
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    bot.send_message(message.from_user.id, text.MSG_START)
+WEBAPP_HOST = '0.0.0.0'
+WEBAPP_PORT = os.environ.get('PORT')
 
 
-@bot.message_handler(commands=['help'])
-def send_help(message):
-    bot.send_message(message.from_user.id, text.MSG_HELP)
+class Call(typing.NamedTuple):
+    DELETE = 'DELETE'
+    CANCEL = 'CANCEL'
+    IGNORE = 'IGNORE'
 
 
-@bot.message_handler(commands=['scheme'])
-def send_scheme(message):
-    bot.send_document(message.from_user.id, SCHEME)
+bot = Bot(TOKEN)
+dispatcher = Dispatcher(bot)
+logging.basicConfig(level=logging.INFO)
 
 
-@bot.message_handler(commands=['one'])
-def start_search_one(message):
-    procedure = utils.loads(DEFAULT_ONE)
-    bot.send_message(message.from_user.id, text.MSG_SEARCH,
-                     reply_markup=one_dir_kb(procedure))
+async def on_startup(dispatcher):
+    await bot.set_webhook(WEBHOOK_URL)
+    await bot.set_my_commands(config.COMMANDS)
 
 
-@bot.message_handler(commands=['mcd'])
-def start_search_diff(message):
-    procedure = utils.loads(DEFAULT_MCD)
-    bot.send_message(message.from_user.id, text.MSG_SEARCH,
-                     reply_markup=mcd_dir_kb(procedure))
+@dispatcher.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    await message.answer(text.MSG_START)
 
 
-@bot.message_handler(commands=['diff'])
-def start_search_diff(message):
-    procedure = utils.loads(DEFAULT_DIFF)
-    bot.send_message(message.from_user.id, text.MSG_SEARCH,
-                     reply_markup=diff_dir_kb(procedure))
+@dispatcher.message_handler(commands=['help'])
+async def send_help(message: types.Message):
+    await message.answer(text.MSG_HELP)
 
 
-@bot.message_handler(commands=['aeroexp'])
-def aeroexpress_search(message):
-    bot.send_message(message.from_user.id, text.MSG_AERO,
-                     reply_markup=aeroexpress_kboard())
+@dispatcher.message_handler(commands=['search'])
+async def start_search(message: types.Message):
+    procedure = await util.loads(config.DEFAULT_SEARCH)
+    markup = await search_table(procedure)
+    await message.answer(text.MSG_SEARCH, reply_markup=markup)
 
 
-@bot.message_handler(commands=['calendar'])
-def send_calendar(message):
-    bot.send_message(message.from_user.id, 'Выбери дату',
-                     reply_markup=calendar_kboard())
+@dispatcher.message_handler(commands=['mcd'])
+async def start_mcd(message: types.Message):
+    procedure = await util.loads(config.DEFAULT_MCD)
+    markup = await mcd_direction_kboard(procedure)
+    await message.answer(text.MSG_MCD, reply_markup=markup)
 
 
-@bot.message_handler(content_types=['text'])
-def send_text_message(message):
+# @dispatcher.message_handler(commands=['calendar'])
+# async def send_calendar(message: types.Message):
+#     await message.answer('Выбери дату', reply_markup=calendar_kboard())
+
+
+@dispatcher.message_handler(commands=['aeroexp'])
+async def aeroexpress_search(message: types.Message):
+    procedure = await util.loads(config.DEFAULT_AEROEXP)
+    markup = await aeroexp_kboard(procedure)
+    await message.answer(text.MSG_AEROEXP, reply_markup=markup)
+
+
+@dispatcher.message_handler(commands=['scheme'])
+async def send_scheme(message: types.Message):
+    await message.answer_document(config.SCHEME)
+
+
+@dispatcher.message_handler(content_types=types.ContentTypes.TEXT)
+async def send_text_message(message: types.Message):
     if message.text.upper() == 'ПРИВЕТ':
-        bot.send_message(message.from_user.id, text.MSG_HELLO)
+        await message.answer(text.MSG_HELLO)
     else:
-        bot.send_message(message.from_user.id, message.text)
+        await message.answer(message.text)
 
 
-@bot.callback_query_handler(func=lambda call: True)
-def callback_worker(call):
-    procedure = utils.loads(call.data)
-    if procedure['call'] in ('DELETE', 'CANCEL'):
-        bot.delete_message(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id
-        )
-    one_worker(bot, call)
-    mcd_worker(bot, call)
-    diff_worker(bot, call)
-    aeroexpress_worker(bot, call)
-    calendar_worker(bot, call)
+@dispatcher.callback_query_handler()
+async def callback_worker(call: types.CallbackQuery) -> None:
+    procedure = await util.loads(call.data)
+
+    if procedure['call'] in (Call.DELETE, Call.CANCEL):
+        await call.message.delete()
+    elif procedure['call'] == Call.IGNORE:
+        return None
+    await mcd_worker(call)
+    await search_worker(call)
+    await aeroexp_worker(call)
+    return None
 
 
-@server.route('/' + TOKEN, methods=['POST'])
-def get_updates():
-    bot.process_new_updates(
-        [Update.de_json(request.stream.read().decode("utf-8"))]
+if __name__ == '__main__':
+    executor.start_webhook(dispatcher=dispatcher, webhook_path=WEBHOOK_PATH,
+                           on_startup=on_startup, skip_updates=True,
+                           host=WEBAPP_HOST, port=WEBAPP_PORT,
     )
-    return '!', 200
-
-
-bot.remove_webhook()
-bot.set_webhook(url=WEBHOOK_HOST + TOKEN)
-
-if __name__ == "__main__":
-    server.run(host=WEBHOOK_LISTEN, port=WEBHOOK_PORT)

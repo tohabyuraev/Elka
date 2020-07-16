@@ -1,233 +1,193 @@
 """
 mcd.py - script for 'mcd' command
-
-Direction keyboard example:
-first  direction
-second direction
-................
-page1      page2
-
-Station keyboard example:
-first  station
-second station
-..............
-page1....page7
 """
 
 __author__ = 'Anthony Byuraev'
 
+import typing
+import logging
 from math import ceil
 
-from telebot import TeleBot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from telebot.types import CallbackQuery
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, ChatActions
 
-import text
-import utils
-from database import elka_db
-from utils.parsing import schedule
-
-
-CALLS = (
-    'MCD_SEARCH',
-    'MCD_DEPARTURE',
-    'MCD_DESTINATION',
-    'MCD_SCHEDULE',
-)
+import util
+from data import conn
+from text import MSG_MCD, MSG_SEARCH
+from util import schedule, callback_builder
+from scripts.search import schedule_kboard, get_selection_bar
 
 
-def mcd_dir_kb(root: dict):
+class Call(typing.NamedTuple):
+    DIR = 'DIR'
+    TABLE = 'TABLE'
+    MSTTO = 'MSTTO'
+    MSTFROM = 'MSTFROM'
+    CANCEL = 'CANCEL' # sys_command
+    IGNORE = 'IGNORE' # sys_command
+    DELETE = 'DELETE' # sys_command
+    UPDATE = 'UPDATE' # skip to search_worker
+    REVERSE = 'REVERSE' # skip to search_worker
+    SCHEDULE = 'SCHEDULE' # skip to search_worker
+
+
+class MarkupText(typing.NamedTuple):
+    STTO = 'Станция назначения'
+    STFROM = 'Станция отправления'
+    MSTTO = 'Выбери станцию назначения'
+    MSTFROM = 'Выбери станцию отправления'
+
+
+callback_cancel = Call.CANCEL
+callback_ignore = Call.IGNORE
+callback_delete = Call.DELETE
+
+
+async def mcd_table(root: typing.Dict[str, str]) -> InlineKeyboardMarkup:
     """
-    Builds direction keyboard with directions column and pages selection bar
+    Builds mcd search table keyboard
     """
-    callback = {
-        'call': 'MCD_DEPARTURE',
-        'acq': '1',
-    }
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    callback_to = await callback_builder(root, Call.MSTTO)
+    callback_from = await callback_builder(root, Call.MSTFROM)
+    callback_schedule = await callback_builder(root, Call.SCHEDULE)
 
-    keyboard = InlineKeyboardMarkup()
+    sto_field_is_completed = root.get('sto') not in (None, '')
+    sfrom_field_is_completed = root.get('sfrom') not in (None, '')
 
-    directions = elka_db.mcd.name_()
-    directions_id = elka_db.mcd.id_()
+    if sto_field_is_completed:
+        station_to = conn.execute(
+            'SELECT name FROM station WHERE id = ?', (root['sto'],)
+        ).fetchone()['name']
+    else:
+        station_to = ' '
+    if sfrom_field_is_completed:
+        station_from = conn.execute(
+            'SELECT name FROM station WHERE id = ?', (root['sfrom'],)
+        ).fetchone()['name']
+    else:
+        station_from = ' '
 
-    callback['dfrom'] = directions_id[0]
-    mcd1_button = InlineKeyboardButton(
-        text=directions[0],
-        callback_data=utils.dumps(callback)
+    direction = conn.execute(
+        'SELECT name FROM direction WHERE id = ?', (root['dir'],)
+    ).fetchone()['name']
+    callback_dir = await callback_builder(root, Call.DIR)
+    keyboard.add(InlineKeyboardButton(direction, callback_data=callback_dir))
+
+    keyboard.add(
+        InlineKeyboardButton(MarkupText.STFROM, callback_data=callback_ignore),
+        InlineKeyboardButton(MarkupText.STTO, callback_data=callback_ignore),
+        InlineKeyboardButton(station_from, callback_data=callback_from),
+        InlineKeyboardButton(station_to, callback_data=callback_to),
     )
-
-    callback['dfrom'] = directions_id[1]
-    mcd2_button = InlineKeyboardButton(
-        text=directions[1],
-        callback_data=utils.dumps(callback)
-    )
-    keyboard.add(mcd1_button)
-    keyboard.add(mcd2_button)
-
+    if sfrom_field_is_completed and sto_field_is_completed:
+        keyboard.add(
+            InlineKeyboardButton(
+                'Показать расписание', callback_data=callback_schedule
+            )
+        )
+    keyboard.add(InlineKeyboardButton('Отмена', callback_data=callback_cancel))
     return keyboard
 
 
-def station_kboard(root: dict, lines: int = 8):
+async def mcd_direction_kboard(root: typing.Dict[str, str]) -> InlineKeyboardMarkup:
+    """
+    Builds direction keyboard with directions column
+    """
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    id_list = [
+        item['id']
+        for item in conn.execute('SELECT id FROM direction WHERE id > 10').fetchall()
+    ]
+    name_list = [
+        item['name']
+        for item in conn.execute('SELECT name FROM direction WHERE id > 10').fetchall()
+    ]
+    callback_list = [
+        await callback_builder(root, Call.TABLE, dir=id, sfrom='', sto='', page=0)
+        for id in id_list
+    ]
+    buttons = [
+        InlineKeyboardButton(name, callback_data=callback)
+        for name, callback in zip(name_list, callback_list)
+    ]
+    keyboard.add(*buttons)
+    keyboard.add(InlineKeyboardButton('Отмена', callback_data=callback_cancel))
+    return keyboard
+
+
+async def mcd_station_kboard(root: typing.Dict[str, str],
+                             lines: int = 14) -> InlineKeyboardMarkup:
     """
     Builds station keyboard with stations column and pages selection bar
     """
-    cond_dep = root['call'] == 'MCD_DEPARTURE'
-    cond_des = root['call'] == 'MCD_DESTINATION'
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    id_list = [
+        item['id']
+        for item in conn.execute(
+            'SELECT id FROM station WHERE mcdid = ?', (root['dir'],)
+        ).fetchall()
+    ]
+    name_list = [
+        item['name']
+        for item in conn.execute(
+            'SELECT name FROM station WHERE mcdid = ?', (root['dir'],)
+        ).fetchall()
+    ]
+    if root['call'] == Call.MSTFROM:
+        callback_list = [
+            await callback_builder(root, Call.TABLE, sfrom=id)
+            for id in id_list
+        ]
+    elif root['call'] == Call.MSTTO:
+        callback_list = [
+            await callback_builder(root, Call.TABLE, sto=id)
+            for id in id_list
+        ]
+    buttons = [
+        InlineKeyboardButton(name, callback_data=callback)
+        for name, callback in zip(name_list, callback_list)
+    ]
 
-    if cond_dep:
-        callback = {
-            'call': 'MCD_DESTINATION',
-            'dfrom': root.get('dfrom', '1'),
-            'acq': '1',
-        }
-    elif cond_des:
-        callback = {
-            'call': 'MCD_SCHEDULE',
-            'dfrom': root.get('dfrom', '1'),
-            'sfrom': root.get('sfrom', '58708'),
-            'acq': '1',
-        }
-
-    keyboard = InlineKeyboardMarkup()
-
-    stations = elka_db.mcd_station.name_(root.get('dfrom', '1'))
-    stations_id = elka_db.mcd_station.id_(root.get('dfrom', '1'))
-
-    root['pages'] = ceil(len(stations) / lines)
-
-    if root.get('page') == '':
+    pages = ceil(id_list.__len__() / lines)
+    if root.get('page') in (None, ''):
         page = 0
     else:
-        page = int(root.get('page', '0'))
+        page = int(root['page'])
+    selection_bar = await get_selection_bar(root, page, pages)
 
-    start = lines * page
-    if lines * page + lines > len(stations):
-        stop = len(stations)
-    else:
-        stop = lines * page + lines
-
-    for i in range(start, stop):
-        if cond_dep:
-            callback['sfrom'] = stations_id[i]
-        elif cond_des:
-            callback['sto'] = stations_id[i]
-
-        keyboard.add(
-            InlineKeyboardButton(
-                stations[i], callback_data=utils.dumps(callback)
-            )
-        )
-
-    bar = select_bar(root)
-    keyboard.row(*bar)
-
+    keyboard.add(*buttons[page * lines : page * lines + lines])
+    keyboard.row(*selection_bar)
+    keyboard.add(InlineKeyboardButton('Отмена', callback_data=callback_cancel))
     return keyboard
 
 
-def select_bar(root: dict) -> [InlineKeyboardButton, ...]:
-    pages = int(root.get('pages', '1'))
-    if root.get('page') == '':
-        page = 0
-    else:
-        page = int(root.get('page', '0'))
-
-    bar = []
-
-    for i in range(pages):
-        if page == i:
-            callback = root.copy()
-            callback['page'] = i
-            callback['acq'] = '0'
-            button = InlineKeyboardButton(
-                f'· {i + 1} ·', callback_data=utils.dumps(callback)
-            )
-            bar.append(button)
-        else:
-            callback = root.copy()
-            callback['page'] = i
-            callback['acq'] = '0'
-            button = InlineKeyboardButton(
-                f'{i + 1}', callback_data=utils.dumps(callback)
-            )
-            bar.append(button)
-
-    return bar
-
-
-def schedule_kboard(root: dict) -> InlineKeyboardMarkup:
-    keyboard = InlineKeyboardMarkup()
-    update_button = InlineKeyboardButton(
-        'Обновить расписание',
-        callback_data=utils.dumps(root)
-    )
-    keyboard.add(update_button)
-    reversed_button = InlineKeyboardButton(
-        'В обратном направлении',
-        callback_data=utils.dumps(reversed_root(root))
-    )
-    keyboard.add(reversed_button)
-    remove_button = InlineKeyboardButton(
-        'Удалить расписание',
-        callback_data=utils.dumps({'call': 'DELETE'})
-    )
-    keyboard.add(remove_button)
-    return keyboard
-
-
-def get_url(root: dict) -> str:
-    """
-    Return web page URL with train schedule
-    """
-    return (
-        'https://www.tutu.ru/rasp.php?st1={}&st2={}'
-        .format(root['sfrom'], root['sto'])
-    )
-
-
-def reversed_root(root: dict) -> dict:
-    rev_root = root.copy()
-    rev_root['sfrom'], rev_root['sto'] = root['sto'], root['sfrom']
-    return rev_root
-
-
-def mcd_worker(bot: TeleBot, call: CallbackQuery) -> None:
+async def mcd_worker(call: CallbackQuery) -> None:
     """
     Check for callback for this script
     """
+    procedure = await util.loads(call.data)
 
-    procedure = utils.loads(call.data)
+    if procedure['call'] == Call.DIR:
+        text = MSG_MCD
+        markup = await mcd_direction_kboard(procedure)
+        await call.message.edit_text(text, reply_markup=markup)
+        return None
+    
+    elif procedure['call'] == Call.TABLE:
+        text = MSG_SEARCH
+        markup = await mcd_table(procedure)
+        await call.message.edit_text(text, reply_markup=markup)
+        return None
 
-    if procedure['call'] == 'MCD_SEARCH':
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text=text.MSG_SEARCH,
-            reply_markup=mcd_dir_kb(procedure)
-        )
-    elif procedure['call'] == 'MCD_DEPARTURE':
-        if procedure['acq'] == '1':
-            bot.answer_callback_query(call.id, 'Направление выбрано')
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text='Выбери станцию отправления:',
-            reply_markup=station_kboard(procedure)
-        )
-    elif procedure['call'] == 'MCD_DESTINATION':
-        if procedure['acq'] == '1':
-            bot.answer_callback_query(call.id, 'Станция отправления выбрана')
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text='Выбери станцию назначения:',
-            reply_markup=station_kboard(procedure)
-        )
-    elif procedure['call'] == 'MCD_SCHEDULE':
-        if procedure['acq'] == '1':
-            bot.answer_callback_query(call.id, 'Станция назначения выбрана')
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text=schedule(procedure),
-            reply_markup=schedule_kboard(procedure)
-        )
+    elif procedure['call'] == Call.MSTFROM:
+        text = MarkupText.MSTFROM
+        markup = await mcd_station_kboard(procedure)
+        await call.message.edit_text(text, reply_markup=markup)
+        return None
+
+    elif procedure['call'] == Call.MSTTO:
+        text = MarkupText.MSTTO
+        markup = await mcd_station_kboard(procedure)
+        await call.message.edit_text(text, reply_markup=markup)
+        return None

@@ -1,13 +1,15 @@
-'date.py - Inline keyboard for travel date selection'
+"""
+date.py - Inline keyboard for travel date selection
+"""
 
 __author__ = 'Anthony Byuraev'
 
 import calendar
 from datetime import datetime, timedelta
 
-from telebot import TeleBot
-from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
-from telebot.types import CallbackQuery
+from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import CallbackQuery
 
 import text
 from scripts.one import one_dir_kb
@@ -155,11 +157,10 @@ def create_months_calendar(year: int = None):
     return keyboard
 
 
-def calendar_worker(bot: TeleBot, call: CallbackQuery):
+async def calendar_worker(bot: Bot, call: CallbackQuery):
     """
     Creates a new calendar if the forward or backward button is pressed
     """
-
     procedure = unpack_data(call.data)
 
     if procedure['call'] in CALLS:
@@ -169,21 +170,21 @@ def calendar_worker(bot: TeleBot, call: CallbackQuery):
         current = datetime(int(year), int(month), 1)
 
     if procedure['call'] == "IGNORE":
-        bot.answer_callback_query(callback_query_id=call.id)
         return False, None
     elif procedure['call'] == "DAY":
         date = f'{day}.{month}.{year}'
         callback_data = callback('SEARCH', 'DIR', 'DEP', 'DES', '0', '0', date)
         procedure = unpack_kb_data(callback_data)
-        bot.edit_message_text(
+        await bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=text.MSG_SEARCH,
             reply_markup=one_dir_kb(procedure)
         )
+        return None
     elif procedure['call'] == "PREVIOUS-MONTH":
         preview_month = current - timedelta(days=1)
-        bot.edit_message_text(
+        await bot.edit_message_text(
             text=call.message.text,
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -195,7 +196,7 @@ def calendar_worker(bot: TeleBot, call: CallbackQuery):
         return None
     elif procedure['call'] == "NEXT-MONTH":
         next_month = current + timedelta(days=31)
-        bot.edit_message_text(
+        await bot.edit_message_text(
             text=call.message.text,
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -206,7 +207,7 @@ def calendar_worker(bot: TeleBot, call: CallbackQuery):
         )
         return None
     elif procedure['call'] == "MONTHS":
-        bot.edit_message_text(
+        await bot.edit_message_text(
             text=call.message.text,
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -214,7 +215,7 @@ def calendar_worker(bot: TeleBot, call: CallbackQuery):
         )
         return None
     elif procedure['call'] == "MONTH":
-        bot.edit_message_text(
+        await bot.edit_message_text(
             text=call.message.text,
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
