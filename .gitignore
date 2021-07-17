@@ -1,11 +1,6 @@
-# Игнор файлы для VisualStudioCode
-.vscode
-__pycache__
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-*.code-workspace
-
-# Игнор файлы для Python
+﻿# Игнор файлы для Python
 .venv
+__pycache__
+
+scrape/
+unused/
