@@ -1,5 +1,3 @@
-__author__ = 'Anthony Byuraev'
-
 import typing
 import random
 import logging

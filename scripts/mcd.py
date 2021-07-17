@@ -2,8 +2,6 @@
 mcd.py - script for 'mcd' command
 """
 
-__author__ = 'Anthony Byuraev'
-
 import typing
 import logging
 from math import ceil
@@ -11,9 +9,9 @@ from math import ceil
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import CallbackQuery, ChatActions
 
+import text
 import util
 from data import conn
-from text import MSG_MCD, MSG_SEARCH
 from util import schedule, callback_builder
 from scripts.search import schedule_kboard, get_selection_bar
 
@@ -169,25 +167,25 @@ async def mcd_worker(call: CallbackQuery) -> None:
     procedure = await util.loads(call.data)
 
     if procedure['call'] == Call.DIR:
-        text = MSG_MCD
+        message_text = text.MCD
         markup = await mcd_direction_kboard(procedure)
-        await call.message.edit_text(text, reply_markup=markup)
+        await call.message.edit_text(message_text, reply_markup=markup)
         return None
     
     elif procedure['call'] == Call.TABLE:
-        text = MSG_SEARCH
+        message_text = text.SEARCH
         markup = await mcd_table(procedure)
-        await call.message.edit_text(text, reply_markup=markup)
+        await call.message.edit_text(message_text, reply_markup=markup)
         return None
 
     elif procedure['call'] == Call.MSTFROM:
-        text = MarkupText.MSTFROM
+        message_text = MarkupText.MSTFROM
         markup = await mcd_station_kboard(procedure)
-        await call.message.edit_text(text, reply_markup=markup)
+        await call.message.edit_text(message_text, reply_markup=markup)
         return None
 
     elif procedure['call'] == Call.MSTTO:
-        text = MarkupText.MSTTO
+        message_text = MarkupText.MSTTO
         markup = await mcd_station_kboard(procedure)
-        await call.message.edit_text(text, reply_markup=markup)
+        await call.message.edit_text(message_text, reply_markup=markup)
         return None

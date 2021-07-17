@@ -2,8 +2,6 @@
 aeroexpress.py - special module for "aeroexp" command
 """
 
-__author__ = 'Anthony Byuraev'
-
 import typing
 import logging
 

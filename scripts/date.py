@@ -2,8 +2,6 @@
 date.py - Inline keyboard for travel date selection
 """
 
-__author__ = 'Anthony Byuraev'
-
 import calendar
 from datetime import datetime, timedelta
 

@@ -47,26 +47,26 @@ async def on_startup(dispatcher):
 
 @dispatcher.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
-    await message.answer(text.MSG_START)
+    await message.answer(text.START)
 
 
 @dispatcher.message_handler(commands=['help'])
 async def send_help(message: types.Message):
-    await message.answer(text.MSG_HELP)
+    await message.answer(text.HELP)
 
 
 @dispatcher.message_handler(commands=['search'])
 async def start_search(message: types.Message):
     procedure = await util.loads(config.DEFAULT_SEARCH)
     markup = await search_table(procedure)
-    await message.answer(text.MSG_SEARCH, reply_markup=markup)
+    await message.answer(text.SEARCH, reply_markup=markup)
 
 
 @dispatcher.message_handler(commands=['mcd'])
 async def start_mcd(message: types.Message):
     procedure = await util.loads(config.DEFAULT_MCD)
     markup = await mcd_direction_kboard(procedure)
-    await message.answer(text.MSG_MCD, reply_markup=markup)
+    await message.answer(text.MCD, reply_markup=markup)
 
 
 # @dispatcher.message_handler(commands=['calendar'])
@@ -78,7 +78,7 @@ async def start_mcd(message: types.Message):
 async def aeroexpress_search(message: types.Message):
     procedure = await util.loads(config.DEFAULT_AEROEXP)
     markup = await aeroexp_kboard(procedure)
-    await message.answer(text.MSG_AEROEXP, reply_markup=markup)
+    await message.answer(text.AEROEXP, reply_markup=markup)
 
 
 @dispatcher.message_handler(commands=['scheme'])
@@ -89,7 +89,7 @@ async def send_scheme(message: types.Message):
 @dispatcher.message_handler(content_types=types.ContentTypes.TEXT)
 async def send_text_message(message: types.Message):
     if message.text.upper() == 'ПРИВЕТ':
-        await message.answer(text.MSG_HELLO)
+        await message.answer(text.HELLO)
     else:
         await message.answer(message.text)
 
